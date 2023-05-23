@@ -32,7 +32,7 @@ app.get("/songs", async (req, res) => {
     } catch (error) {
         res.status(404).json({
             ok: false,
-            error: error,
+            error,
             msg: "File not found",
         });
     }
@@ -40,10 +40,14 @@ app.get("/songs", async (req, res) => {
 
 app.get("/songs/:id", async (req, res) => {
     const { id } = req.params;
-    const songs = JSON.parse(await readFile("repertory.json"));
-    const song = songs.find(item => item.id === id);
-    if (!song) res.status(404).json({ error: "Song not found" });
-    res.json(song);
+    try {
+        const songs = JSON.parse(await readFile("repertory.json"));
+        const song = songs.find(item => item.id === id);
+        if (!song) res.status(404).json({ error: "Song not found" });
+        res.json(song);
+    } catch (error) {
+        res.status(404).json({ ok: false, error, msg: "File not found" });
+    }
 });
 
 
@@ -56,21 +60,27 @@ app.post("/songs", async (req, res) => {
         artist,
         tone
     };
-    const songs = JSON.parse(await readFile("repertory.json"))
 
     if (!title || !artist || !tone) {
         return res.status(401).send("You must complete all required fields or you will not be able to add a song");
-    } else {
-        songs.push(newSong);
     }
 
-    await writeFile("repertory.json", JSON.stringify(songs))
-
-    res.status(201).json({
-        ok: true,
-        msg: 'Song adds successfully',
-        song: newSong
-    });
+    try {
+        const songs = JSON.parse(await readFile("repertory.json"))
+        songs.push(newSong);
+        await writeFile("repertory.json", JSON.stringify(songs))
+        res.status(201).json({
+            ok: true,
+            msg: 'Song adds successfully',
+            song: newSong
+        });
+    } catch (error) {
+        res.json({
+            ok: false,
+            error,
+            msg: "There was an error adding the song",
+        });
+    }
 })
 
 
@@ -78,54 +88,69 @@ app.post("/songs", async (req, res) => {
 app.put("/songs/:id", async (req, res) => {
     const { id } = req.params
     const { title, artist, tone } = req.body
-    const songs = JSON.parse(await readFile("repertory.json"))
-    const selectedSong = songs.findIndex(item => item.id === id)
-
-    if (selectedSong < 0) {
-        return res.status(404).json({
-            ok: false,
-            msg: "Song doesn't exists",
-        })
-    }
 
     if (!title || !artist || !tone) {
         return res.status(400).send("All fields must be filled in, even those that you do not want to modify.")
     }
 
-    const updateSong = songs.map((item) => {
-        if (item.id == id) {
-            item.title = title,
-                item.artist = artist,
-                item.tone = tone
+    try {
+        const songs = JSON.parse(await readFile("repertory.json"))
+        const selectedSong = songs.findIndex(item => item.id === id)
+
+        if (selectedSong < 0) {
+            return res.status(404).json({
+                ok: false,
+                msg: "Song doesn't exists",
+            })
         }
-        return item
-    })
+        const updateSong = songs.map((item) => {
+            if (item.id == id) {
+                item.title = title,
+                    item.artist = artist,
+                    item.tone = tone
+            }
+            return item
+        })
 
-    await writeFile("repertory.json", JSON.stringify(updateSong))
-
-    res.status(200).json({
-        ok: true,
-        msg: "Song successfully updated",
-    })
+        await writeFile("repertory.json", JSON.stringify(updateSong))
+        res.status(200).json({
+            ok: true,
+            msg: "Song successfully updated",
+        })
+    } catch (error) {
+        res.status(400).json({
+            ok: false,
+            error,
+            msg: "There was an error updating the song",
+        });
+    }
 })
 
 
 //DELETE
 app.delete("/songs/:id", async (req, res) => {
     const { id } = req.params
-    const songs = JSON.parse(await readFile("repertory.json"))
-    const songFilter = songs.filter(item => item.id != id)
-
-    if (songs.length == songFilter.length) {
-        return res.status(400).send("Wrong or non-existent ID");
+    try {
+        const songs = JSON.parse(await readFile("repertory.json"))
+        const songFilter = songs.filter(item => item.id != id)
+    
+        if (songs.length == songFilter.length) {
+            return res.status(400).send("Wrong or non-existent ID");
+        }
+    
+        await writeFile("repertory.json", JSON.stringify(songFilter))
+    
+        res.status(200).json({
+            ok: true,
+            msg: "Song successfully deleted",
+        });
+    } catch (error) {
+        res.status(400).json({
+            ok: false,
+            error,
+            msg: "There was an error deleting the song",
+        });
     }
-
-    await writeFile("repertory.json", JSON.stringify(songFilter))
-
-    res.status(200).json({
-        ok: true,
-        msg: "Song successfully deleted",
-    });
 })
 
 
